@@ -218,42 +218,29 @@ public static class SquashFeatures
 
     private static void UpdateUsingStatements(List<string> lines, HashSet<string> usingStatements)
     {
-        // Find the index of the namespace declaration
-        var namespaceIndex = -1;
-        for (var i = 0; i < lines.Count; i++)
-        {
-            if (lines[i].TrimStart().StartsWith("namespace "))
-            {
-                namespaceIndex = i;
-                break;
-            }
-        }
-
+        // Find the index of the namespace declaration line
+        var namespaceIndex = lines.FindIndex(line => line.TrimStart().StartsWith("namespace "));
         if (namespaceIndex == -1)
         {
-            // No namespace found, maybe an error
-            AnsiConsole.MarkupLine("[red]No namespace declaration found in the first migration file.[/]");
+            AnsiConsole.MarkupLine("[red]No namespace declaration found in the file.[/]");
             return;
         }
 
-        // Collect all lines before the namespace
-        var headerLines = lines.Take(namespaceIndex).ToList();
+        var insertIndex = namespaceIndex + 1;
 
-        // Remove existing using statements from headerLines
-        headerLines = headerLines.Where(line => !line.TrimStart().StartsWith("using ")).ToList();
+        // Remove any existing using statements immediately after the namespace declaration
+        while (insertIndex < lines.Count && lines[insertIndex].TrimStart().StartsWith("using "))
+        {
+            lines.RemoveAt(insertIndex);
+        }
 
-        // Prepare the sorted using statements
         var sortedUsings = usingStatements.OrderBy(u => u).ToList();
 
-        // Build the new header
-        var newHeaderLines = new List<string>();
-        newHeaderLines.AddRange(headerLines);
-        newHeaderLines.AddRange(sortedUsings);
-        newHeaderLines.Add(""); // Add an empty line
+        // Insert an empty line after the namespace for readability
+        sortedUsings.Insert(0, "");
 
-        // Replace the lines in the file
-        lines.RemoveRange(0, namespaceIndex);
-        lines.InsertRange(0, newHeaderLines);
+        // Insert the using statements into the lines at the insertIndex
+        lines.InsertRange(insertIndex, sortedUsings);
     }
 
     private static void ReplaceMethodContent(List<string> lines, string methodName, string newContent)
