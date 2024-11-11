@@ -9,6 +9,15 @@
         <RootNamespace>StewardEF</RootNamespace>
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>steward</ToolCommandName>
+        <PackageOutputPath>./nupkg</PackageOutputPath>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <Description>StewardEF is a tool designed to make managing Entity Framework (EF) migrations easier for projects with a lengthy history. Specifically, it is able to squash your migrations back to a single file and drastically speed up your build times.</Description>
+        <Authors>Paul DeVito</Authors>
+        <PackageTags>enitity-framework migrations entity-framework-core squash</PackageTags>
+        <RepositoryUrl>https://github.com/pdevito3/StewardEF</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/pdevito3/StewardEF</PackageProjectUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
         <Version>0.1.0</Version>
     </PropertyGroup>
 

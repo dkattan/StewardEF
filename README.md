@@ -1,6 +1,7 @@
 # StewardEF 🛠️
 
-StewardEF is a tool designed to make managing Entity Framework (EF) migrations easier for projects with a lengthy history. Specifically, it is able to consolidate your migrations back to a single file and drastically speed up your build times.
+StewardEF is a tool designed to make managing Entity Framework (EF) migrations easier for projects with a lengthy history. 
+Specifically, it is able to squash your migrations back to a single file and drastically speed up your build times.
 
 EF Core does not yet provide a built-in solution for squashing migrations yet ([relevant issue here](https://github.com/dotnet/efcore/issues/2174)), but in the meantime, StewardEF can help fill the gap.
 
