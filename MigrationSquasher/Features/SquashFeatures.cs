@@ -10,7 +10,8 @@ public static class SquashFeatures
     {
         // Get all .cs files excluding Designer.cs files
         var files = Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories);
-        var migrationFiles = files.Where(f => !f.EndsWith("Designer.cs", StringComparison.OrdinalIgnoreCase))
+        var migrationFiles = files
+            .Where(f => !f.EndsWith("Designer.cs", StringComparison.OrdinalIgnoreCase))
             .OrderBy(f => f)
             .ToList();
 
@@ -26,21 +27,30 @@ public static class SquashFeatures
         if (File.Exists(upFilePath)) File.Delete(upFilePath);
         if (File.Exists(downFilePath)) File.Delete(downFilePath);
 
-        // Process each migration file
+        // Process each migration file for 'Up' methods (in ascending order)
         foreach (var file in migrationFiles)
         {
             var fileName = Path.GetFileName(file);
             var migrationLines = File.ReadAllLines(file);
 
-            // Extract the contents of the Up and Down methods
+            // Extract the contents of the Up method
             var upContent = ExtractMethodContent(migrationLines, "Up");
-            var downContent = ExtractMethodContent(migrationLines, "Down");
 
             // Append to up.txt
             if (!string.IsNullOrEmpty(upContent))
             {
                 File.AppendAllText(upFilePath, $"// {fileName}{Environment.NewLine}{upContent}{Environment.NewLine}{Environment.NewLine}");
             }
+        }
+
+        // Process each migration file for 'Down' methods (in descending order)
+        foreach (var file in migrationFiles.AsEnumerable().Reverse())
+        {
+            var fileName = Path.GetFileName(file);
+            var migrationLines = File.ReadAllLines(file);
+
+            // Extract the contents of the Down method
+            var downContent = ExtractMethodContent(migrationLines, "Down");
 
             // Append to down.txt
             if (!string.IsNullOrEmpty(downContent))
@@ -148,7 +158,7 @@ public static class SquashFeatures
         var aggregatedDownContent = new StringBuilder();
         var usingStatements = new HashSet<string>();
 
-        // Collect Up and Down contents and using statements from all migration files
+        // Collect Up contents from all migration files (ascending order)
         foreach (var file in migrationFiles)
         {
             var fileName = Path.GetFileName(file);
@@ -161,9 +171,8 @@ public static class SquashFeatures
                 usingStatements.Add(u);
             }
 
-            // Extract the contents of the Up and Down methods
+            // Extract the contents of the Up method
             var upContent = ExtractMethodContent(migrationLines, "Up");
-            var downContent = ExtractMethodContent(migrationLines, "Down");
 
             if (!string.IsNullOrEmpty(upContent))
             {
@@ -171,6 +180,23 @@ public static class SquashFeatures
                 aggregatedUpContent.AppendLine(upContent);
                 aggregatedUpContent.AppendLine();
             }
+        }
+
+        // Collect Down contents from all migration files (descending order)
+        foreach (var file in migrationFiles.AsEnumerable().Reverse())
+        {
+            var fileName = Path.GetFileName(file);
+            var migrationLines = File.ReadAllLines(file);
+
+            // Extract the using statements
+            var usings = ExtractUsingStatements(migrationLines);
+            foreach (var u in usings)
+            {
+                usingStatements.Add(u);
+            }
+
+            // Extract the contents of the Down method
+            var downContent = ExtractMethodContent(migrationLines, "Down");
 
             if (!string.IsNullOrEmpty(downContent))
             {
@@ -193,7 +219,7 @@ public static class SquashFeatures
         // Write the updated content back to the first migration file
         File.WriteAllLines(firstMigrationFile, firstMigrationLines);
 
-        // Delete subsequent migration files and their designer files
+        // Delete subsequent migration files
         var filesToDelete = migrationFiles.Skip(2).ToList();
 
         foreach (var file in filesToDelete)
