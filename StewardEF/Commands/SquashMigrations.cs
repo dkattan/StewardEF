@@ -31,7 +31,6 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         }
 
         SquashMigrations(directory);
-        AnsiConsole.MarkupLine("[green]Migrations have been squashed successfully.[/]");
         return 0;
     }
     
@@ -88,7 +87,7 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             File.Delete(file);
         }
 
-        AnsiConsole.MarkupLine("[green]Migrations squashed successfully![/]");
+        AnsiConsole.MarkupLine($"[green]Migrations squashed successfully! {Emoji.Known.Sparkles}[/]");
     }
 
     
