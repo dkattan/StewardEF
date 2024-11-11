@@ -120,7 +120,7 @@ public static class SquashFeatures
 
         return methodContent.ToString().Trim();
     }
-
+    
     public static void SquashMigrations(string directory)
     {
         // Get all .cs files including Designer.cs files
@@ -128,7 +128,7 @@ public static class SquashFeatures
             .OrderBy(f => f)
             .ToList();
 
-        // Filter out the snapshot and the initial migration files
+        // Filter out the snapshot files
         var migrationFiles = files
             .Where(f => !Path.GetFileName(f).EndsWith("ModelSnapshot.cs", StringComparison.OrdinalIgnoreCase))
             .OrderBy(f => f)
@@ -146,12 +146,20 @@ public static class SquashFeatures
         // Prepare to collect aggregated Up and Down contents
         var aggregatedUpContent = new StringBuilder();
         var aggregatedDownContent = new StringBuilder();
+        var usingStatements = new HashSet<string>();
 
-        // Collect Up and Down contents from all migration files
+        // Collect Up and Down contents and using statements from all migration files
         foreach (var file in migrationFiles)
         {
             var fileName = Path.GetFileName(file);
             var migrationLines = File.ReadAllLines(file);
+
+            // Extract the using statements
+            var usings = ExtractUsingStatements(migrationLines);
+            foreach (var u in usings)
+            {
+                usingStatements.Add(u);
+            }
 
             // Extract the contents of the Up and Down methods
             var upContent = ExtractMethodContent(migrationLines, "Up");
@@ -179,6 +187,9 @@ public static class SquashFeatures
         ReplaceMethodContent(firstMigrationLines, "Up", aggregatedUpContent.ToString());
         ReplaceMethodContent(firstMigrationLines, "Down", aggregatedDownContent.ToString());
 
+        // Update the using statements in the first migration file
+        UpdateUsingStatements(firstMigrationLines, usingStatements);
+
         // Write the updated content back to the first migration file
         File.WriteAllLines(firstMigrationFile, firstMigrationLines);
 
@@ -193,7 +204,51 @@ public static class SquashFeatures
         AnsiConsole.MarkupLine("[green]Migrations squashed successfully![/]");
     }
 
-    
+    private static IEnumerable<string> ExtractUsingStatements(string[] lines)
+    {
+        return lines.Where(line => line.TrimStart().StartsWith("using ")).Select(line => line.Trim());
+    }
+
+    private static void UpdateUsingStatements(List<string> lines, HashSet<string> usingStatements)
+    {
+        // Find the index of the namespace declaration
+        int namespaceIndex = -1;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (lines[i].TrimStart().StartsWith("namespace "))
+            {
+                namespaceIndex = i;
+                break;
+            }
+        }
+
+        if (namespaceIndex == -1)
+        {
+            // No namespace found, maybe an error
+            AnsiConsole.MarkupLine("[red]No namespace declaration found in the first migration file.[/]");
+            return;
+        }
+
+        // Collect all lines before the namespace
+        var headerLines = lines.Take(namespaceIndex).ToList();
+
+        // Remove existing using statements from headerLines
+        headerLines = headerLines.Where(line => !line.TrimStart().StartsWith("using ")).ToList();
+
+        // Prepare the sorted using statements
+        var sortedUsings = usingStatements.OrderBy(u => u).ToList();
+
+        // Build the new header
+        var newHeaderLines = new List<string>();
+        newHeaderLines.AddRange(headerLines);
+        newHeaderLines.AddRange(sortedUsings);
+        newHeaderLines.Add(""); // Add an empty line
+
+        // Replace the lines in the file
+        lines.RemoveRange(0, namespaceIndex);
+        lines.InsertRange(0, newHeaderLines);
+    }
+
     private static void ReplaceMethodContent(List<string> lines, string methodName, string newContent)
     {
         var methodSignature = $"protected override void {methodName}(MigrationBuilder migrationBuilder)";
@@ -274,9 +329,9 @@ public static class SquashFeatures
         }
     }
 
-        private static string GetIndentation(string line)
-        {
-            var match = Regex.Match(line, @"^\s*");
+    private static string GetIndentation(string line)
+    {
+        var match = Regex.Match(line, @"^\s*");
         return match.Value;
     }
 
