@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Steward (Local)": {
+      "commandName": "Project",
+      "commandLineArgs": "squash"
+    }
+  }
+}

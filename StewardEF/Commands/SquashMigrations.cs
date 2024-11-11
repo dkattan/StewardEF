@@ -1,48 +1,41 @@
-namespace MigrationSquasher.Features;
+namespace StewardEF.Commands;
 
 using System.Text;
 using System.Text.RegularExpressions;
 using Spectre.Console;
+using Spectre.Console.Cli;
 
-public static class SquashFeatures
+internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Settings>
 {
-    public static void CreateAggregateFiles(string directory)
+    public class Settings : CommandSettings
     {
-        var files = Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories);
-        var migrationFiles = files
-            .Where(f => !f.EndsWith("Designer.cs", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(f => f)
-            .ToList();
-        if (migrationFiles.Count == 0)
+        [CommandArgument(0, "[MigrationsDirectory]")]
+        public string? MigrationsDirectory { get; set; }
+    }
+
+    public override int Execute(CommandContext context, Settings settings)
+    {
+        var directory = settings.MigrationsDirectory 
+                        ?? AnsiConsole.Ask<string>("[green]Enter the migrations directory path:[/]");
+        
+        if (string.IsNullOrWhiteSpace(directory))
         {
-            AnsiConsole.MarkupLine("[red]No migration files found to aggregate.[/]");
-            return;
+            AnsiConsole.MarkupLine("[red]The specified directory is invalid.[/]");
+            return 1;
+        }
+        
+        if (!Directory.Exists(directory))
+        {
+            AnsiConsole.MarkupLine("[red]The specified directory does not exist.[/]");
+            return 1;
         }
 
-        // Prepare output file paths
-        var outputDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "output");
-        if (!Directory.Exists(outputDir))
-            Directory.CreateDirectory(outputDir);
-
-        var upFilePath = Path.Combine(outputDir, "up.txt");
-        var downFilePath = Path.Combine(outputDir, "down.txt");
-
-        // Clear output files if they already exist
-        if (File.Exists(upFilePath)) File.Delete(upFilePath);
-        if (File.Exists(downFilePath)) File.Delete(downFilePath);
-
-        // Get aggregated Up and Down contents
-        var upResult = GetAggregatedMethodContent(migrationFiles, "Up");
-        var downResult = GetAggregatedMethodContent(migrationFiles.AsEnumerable().Reverse(), "Down");
-
-        // Write contents to files
-        File.WriteAllText(upFilePath, upResult.AggregatedContent);
-        File.WriteAllText(downFilePath, downResult.AggregatedContent);
-
-        AnsiConsole.MarkupLine("[green]Aggregation complete![/]");
+        SquashMigrations(directory);
+        AnsiConsole.MarkupLine("[green]Migrations have been squashed successfully.[/]");
+        return 0;
     }
     
-    public static void SquashMigrations(string directory)
+    static void SquashMigrations(string directory)
     {
         // Get all .cs files including Designer.cs files
         var files = Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly)
