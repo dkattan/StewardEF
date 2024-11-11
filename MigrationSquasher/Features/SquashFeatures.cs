@@ -8,12 +8,16 @@ public static class SquashFeatures
 {
     public static void CreateAggregateFiles(string directory)
     {
-        // Get all .cs files excluding Designer.cs files
         var files = Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories);
         var migrationFiles = files
             .Where(f => !f.EndsWith("Designer.cs", StringComparison.OrdinalIgnoreCase))
             .OrderBy(f => f)
             .ToList();
+        if (migrationFiles.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[red]No migration files found to aggregate.[/]");
+            return;
+        }
 
         // Prepare output file paths
         var outputDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "output");
@@ -27,39 +31,115 @@ public static class SquashFeatures
         if (File.Exists(upFilePath)) File.Delete(upFilePath);
         if (File.Exists(downFilePath)) File.Delete(downFilePath);
 
-        // Process each migration file for 'Up' methods (in ascending order)
-        foreach (var file in migrationFiles)
-        {
-            var fileName = Path.GetFileName(file);
-            var migrationLines = File.ReadAllLines(file);
+        // Get aggregated Up and Down contents
+        var upResult = GetAggregatedMethodContent(migrationFiles, "Up");
+        var downResult = GetAggregatedMethodContent(migrationFiles.AsEnumerable().Reverse(), "Down");
 
-            // Extract the contents of the Up method
-            var upContent = ExtractMethodContent(migrationLines, "Up");
-
-            // Append to up.txt
-            if (!string.IsNullOrEmpty(upContent))
-            {
-                File.AppendAllText(upFilePath, $"// {fileName}{Environment.NewLine}{upContent}{Environment.NewLine}{Environment.NewLine}");
-            }
-        }
-
-        // Process each migration file for 'Down' methods (in descending order)
-        foreach (var file in migrationFiles.AsEnumerable().Reverse())
-        {
-            var fileName = Path.GetFileName(file);
-            var migrationLines = File.ReadAllLines(file);
-
-            // Extract the contents of the Down method
-            var downContent = ExtractMethodContent(migrationLines, "Down");
-
-            // Append to down.txt
-            if (!string.IsNullOrEmpty(downContent))
-            {
-                File.AppendAllText(downFilePath, $"// {fileName}{Environment.NewLine}{downContent}{Environment.NewLine}{Environment.NewLine}");
-            }
-        }
+        // Write contents to files
+        File.WriteAllText(upFilePath, upResult.AggregatedContent);
+        File.WriteAllText(downFilePath, downResult.AggregatedContent);
 
         AnsiConsole.MarkupLine("[green]Aggregation complete![/]");
+    }
+    
+    public static void SquashMigrations(string directory)
+    {
+        // Get all .cs files including Designer.cs files
+        var files = Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly)
+            .OrderBy(f => f)
+            .ToList();
+
+        // Filter out the snapshot files
+        var migrationFiles = files
+            .Where(f => !Path.GetFileName(f).EndsWith("ModelSnapshot.cs", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(f => f)
+            .ToList();
+        if (migrationFiles.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[red]No migration files found to squash.[/]");
+            return;
+        }
+
+        // Get the first migration file
+        var firstMigrationFile = migrationFiles.First();
+
+        // Get aggregated Up and Down contents with using statements
+        var upResult = GetAggregatedMethodContent(migrationFiles, "Up", collectUsings: true);
+        var downResult = GetAggregatedMethodContent(migrationFiles.AsEnumerable().Reverse(), "Down", collectUsings: true);
+
+        // Insert the aggregated content into the first migration file
+        var firstMigrationLines = File.ReadAllLines(firstMigrationFile).ToList();
+
+        // Replace the Up and Down methods in the first migration file
+        ReplaceMethodContent(firstMigrationLines, "Up", upResult.AggregatedContent);
+        ReplaceMethodContent(firstMigrationLines, "Down", downResult.AggregatedContent);
+
+        // Combine using statements from both results
+        var allUsingStatements = new HashSet<string>(upResult.UsingStatements);
+        foreach (var usingStmt in downResult.UsingStatements)
+        {
+            allUsingStatements.Add(usingStmt);
+        }
+
+        // Update the using statements in the first migration file
+        UpdateUsingStatements(firstMigrationLines, allUsingStatements);
+
+        // Write the updated content back to the first migration file
+        File.WriteAllLines(firstMigrationFile, firstMigrationLines);
+
+        // Delete subsequent migration files, except the first migration and it's designer file
+        var filesToDelete = migrationFiles.Skip(2).ToList();
+
+        foreach (var file in filesToDelete)
+        {
+            File.Delete(file);
+        }
+
+        AnsiConsole.MarkupLine("[green]Migrations squashed successfully![/]");
+    }
+
+    
+    private class AggregatedMethodResult
+    {
+        public string AggregatedContent { get; set; }
+        public HashSet<string> UsingStatements { get; set; } = [];
+    }
+
+    private static AggregatedMethodResult GetAggregatedMethodContent(
+        IEnumerable<string> files,
+        string methodName,
+        bool collectUsings = false)
+    {
+        var result = new AggregatedMethodResult();
+        var aggregatedContent = new StringBuilder();
+
+        foreach (var file in files)
+        {
+            var fileName = Path.GetFileName(file);
+            var migrationLines = File.ReadAllLines(file);
+
+            if (collectUsings)
+            {
+                // Extract the using statements
+                var usings = ExtractUsingStatements(migrationLines);
+                foreach (var u in usings)
+                {
+                    result.UsingStatements.Add(u);
+                }
+            }
+
+            // Extract the method content
+            var methodContent = ExtractMethodContent(migrationLines, methodName);
+            if (!string.IsNullOrEmpty(methodContent))
+            {
+                aggregatedContent.AppendLine($"// {fileName}");
+                aggregatedContent.AppendLine(methodContent);
+                aggregatedContent.AppendLine();
+            }
+        }
+
+        result.AggregatedContent = aggregatedContent.ToString();
+        return result;
     }
 
     private static string ExtractMethodContent(string[] lines, string methodName)
@@ -131,105 +211,6 @@ public static class SquashFeatures
         return methodContent.ToString().Trim();
     }
     
-    public static void SquashMigrations(string directory)
-    {
-        // Get all .cs files including Designer.cs files
-        var files = Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly)
-            .OrderBy(f => f)
-            .ToList();
-
-        // Filter out the snapshot files
-        var migrationFiles = files
-            .Where(f => !Path.GetFileName(f).EndsWith("ModelSnapshot.cs", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(f => f)
-            .ToList();
-
-        if (migrationFiles.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[red]No migration files found to squash.[/]");
-            return;
-        }
-
-        // Get the first migration file
-        var firstMigrationFile = migrationFiles.First();
-
-        // Prepare to collect aggregated Up and Down contents
-        var aggregatedUpContent = new StringBuilder();
-        var aggregatedDownContent = new StringBuilder();
-        var usingStatements = new HashSet<string>();
-
-        // Collect Up contents from all migration files (ascending order)
-        foreach (var file in migrationFiles)
-        {
-            var fileName = Path.GetFileName(file);
-            var migrationLines = File.ReadAllLines(file);
-
-            // Extract the using statements
-            var usings = ExtractUsingStatements(migrationLines);
-            foreach (var u in usings)
-            {
-                usingStatements.Add(u);
-            }
-
-            // Extract the contents of the Up method
-            var upContent = ExtractMethodContent(migrationLines, "Up");
-
-            if (!string.IsNullOrEmpty(upContent))
-            {
-                aggregatedUpContent.AppendLine($"// {fileName}");
-                aggregatedUpContent.AppendLine(upContent);
-                aggregatedUpContent.AppendLine();
-            }
-        }
-
-        // Collect Down contents from all migration files (descending order)
-        foreach (var file in migrationFiles.AsEnumerable().Reverse())
-        {
-            var fileName = Path.GetFileName(file);
-            var migrationLines = File.ReadAllLines(file);
-
-            // Extract the using statements
-            var usings = ExtractUsingStatements(migrationLines);
-            foreach (var u in usings)
-            {
-                usingStatements.Add(u);
-            }
-
-            // Extract the contents of the Down method
-            var downContent = ExtractMethodContent(migrationLines, "Down");
-
-            if (!string.IsNullOrEmpty(downContent))
-            {
-                aggregatedDownContent.AppendLine($"// {fileName}");
-                aggregatedDownContent.AppendLine(downContent);
-                aggregatedDownContent.AppendLine();
-            }
-        }
-
-        // Insert the aggregated content into the first migration file
-        var firstMigrationLines = File.ReadAllLines(firstMigrationFile).ToList();
-
-        // Replace the Up and Down methods in the first migration file
-        ReplaceMethodContent(firstMigrationLines, "Up", aggregatedUpContent.ToString());
-        ReplaceMethodContent(firstMigrationLines, "Down", aggregatedDownContent.ToString());
-
-        // Update the using statements in the first migration file
-        UpdateUsingStatements(firstMigrationLines, usingStatements);
-
-        // Write the updated content back to the first migration file
-        File.WriteAllLines(firstMigrationFile, firstMigrationLines);
-
-        // Delete subsequent migration files
-        var filesToDelete = migrationFiles.Skip(2).ToList();
-
-        foreach (var file in filesToDelete)
-        {
-            File.Delete(file);
-        }
-
-        AnsiConsole.MarkupLine("[green]Migrations squashed successfully![/]");
-    }
-
     private static IEnumerable<string> ExtractUsingStatements(string[] lines)
     {
         return lines.Where(line => line.TrimStart().StartsWith("using ")).Select(line => line.Trim());
@@ -238,8 +219,8 @@ public static class SquashFeatures
     private static void UpdateUsingStatements(List<string> lines, HashSet<string> usingStatements)
     {
         // Find the index of the namespace declaration
-        int namespaceIndex = -1;
-        for (int i = 0; i < lines.Count; i++)
+        var namespaceIndex = -1;
+        for (var i = 0; i < lines.Count; i++)
         {
             if (lines[i].TrimStart().StartsWith("namespace "))
             {
@@ -278,10 +259,10 @@ public static class SquashFeatures
     private static void ReplaceMethodContent(List<string> lines, string methodName, string newContent)
     {
         var methodSignature = $"protected override void {methodName}(MigrationBuilder migrationBuilder)";
-        int methodStartIndex = -1;
+        var methodStartIndex = -1;
 
         // Find the line index where the method starts
-        for (int i = 0; i < lines.Count; i++)
+        for (var i = 0; i < lines.Count; i++)
         {
             if (lines[i].Contains(methodSignature))
             {
@@ -296,12 +277,12 @@ public static class SquashFeatures
             return;
         }
 
-        int braceLevel = 0;
-        bool methodStarted = false;
-        int methodEndIndex = -1;
+        var braceLevel = 0;
+        var methodStarted = false;
+        var methodEndIndex = -1;
 
         // Start from the method signature line
-        for (int i = methodStartIndex; i < lines.Count; i++)
+        for (var i = methodStartIndex; i < lines.Count; i++)
         {
             var line = lines[i];
 
@@ -320,39 +301,37 @@ public static class SquashFeatures
 
                 if (braceLevel == 0)
                 {
-                    // End of method
                     methodEndIndex = i;
                     break;
                 }
             }
         }
 
-        if (methodEndIndex != -1)
+        if (methodEndIndex == -1) return;
+        
+        // Replace the method content
+        var newMethodContent = new List<string>();
+
+        // Add method signature and opening brace
+        newMethodContent.Add(lines[methodStartIndex]);
+
+        // Ensure opening brace is on its own line
+        if (!lines[methodStartIndex].Trim().EndsWith("{"))
         {
-            // Replace the method content
-            var newMethodContent = new List<string>();
-
-            // Add method signature and opening brace
-            newMethodContent.Add(lines[methodStartIndex]);
-
-            // Ensure opening brace is on its own line
-            if (!lines[methodStartIndex].Trim().EndsWith("{"))
-            {
-                newMethodContent.Add("{");
-            }
-
-            // Add the new content with proper indentation
-            var indentation = GetIndentation(lines[methodStartIndex]);
-            var indentedContent = IndentContent(newContent, indentation + "    ");
-            newMethodContent.AddRange(indentedContent);
-
-            // Add closing brace
-            newMethodContent.Add(indentation + "}");
-
-            // Replace the old method lines with the new ones
-            lines.RemoveRange(methodStartIndex, methodEndIndex - methodStartIndex + 1);
-            lines.InsertRange(methodStartIndex, newMethodContent);
+            newMethodContent.Add("{");
         }
+
+        // Add the new content with proper indentation
+        var indentation = GetIndentation(lines[methodStartIndex]);
+        var indentedContent = IndentContent(newContent, indentation + "    ");
+        newMethodContent.AddRange(indentedContent);
+
+        // Add closing brace
+        newMethodContent.Add(indentation + "}");
+
+        // Replace the old method lines with the new ones
+        lines.RemoveRange(methodStartIndex, methodEndIndex - methodStartIndex + 1);
+        lines.InsertRange(methodStartIndex, newMethodContent);
     }
 
     private static string GetIndentation(string line)
@@ -367,5 +346,4 @@ public static class SquashFeatures
         var indentedLines = lines.Select(line => indentation + line).ToList();
         return indentedLines;
     }
-
 }
