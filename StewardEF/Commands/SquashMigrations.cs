@@ -231,15 +231,13 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             sortedUsings.Insert(0, "");
             sortedUsings.Add(Environment.NewLine); 
             lines.InsertRange(insertIndex, sortedUsings);
+            return;
         }
-        else
-        {
-            // Indent using statements for unscoped namespaces
-            var indentation = GetIndentation(lines[namespaceIndex]) + "    ";
-            var indentedUsings = sortedUsings.Select(u => !string.IsNullOrEmpty(u) ? indentation + u : u).ToList();
-            indentedUsings.Add(Environment.NewLine); 
-            lines.InsertRange(insertIndex, indentedUsings);
-        }
+
+        var indentation = GetIndentation(lines[namespaceIndex]) + "    ";
+        var indentedUsings = sortedUsings.Select(u => !string.IsNullOrEmpty(u) ? indentation + u : u).ToList();
+        indentedUsings.Add(Environment.NewLine); 
+        lines.InsertRange(insertIndex, indentedUsings);
     }
 
 
