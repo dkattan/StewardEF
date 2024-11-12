@@ -218,7 +218,9 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             return;
         }
 
-        var insertIndex = namespaceIndex + 1;
+        var namespaceLine = lines[namespaceIndex];
+        var isScopedNamespace = namespaceLine.TrimEnd().EndsWith(";");
+        var insertIndex = isScopedNamespace ? namespaceIndex + 1 : namespaceIndex + 2;
 
         // Remove any existing using statements immediately after the namespace declaration
         while (insertIndex < lines.Count && lines[insertIndex].TrimStart().StartsWith("using "))
