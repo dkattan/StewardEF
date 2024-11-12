@@ -255,6 +255,7 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             // Method not found
             return;
         }
+        var indentation = GetIndentation(lines[methodStartIndex]);
 
         var braceLevel = 0;
         var methodStarted = false;
@@ -288,21 +289,26 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
 
         if (methodEndIndex == -1) return;
         
+
         // Replace the method content
         var newMethodContent = new List<string>();
 
         // Add method signature and opening brace
+        // Add method signature and opening brace with appropriate indentation
         newMethodContent.Add(lines[methodStartIndex]);
 
         // Ensure opening brace is on its own line
+        // Ensure opening brace is on its own line with correct indentation
         if (!lines[methodStartIndex].Trim().EndsWith("{"))
         {
             newMethodContent.Add("{");
+            newMethodContent.Add(indentation + "{");
         }
+        
 
         // Add the new content with proper indentation
-        var indentation = GetIndentation(lines[methodStartIndex]);
-        var indentedContent = IndentContent(newContent, indentation + "    ");
+        var contentIndentation = GetIndentation(lines[methodStartIndex]);
+        var indentedContent = IndentContent(newContent, contentIndentation + "    ");
         newMethodContent.AddRange(indentedContent);
 
         // Add closing brace
@@ -312,6 +318,7 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         lines.RemoveRange(methodStartIndex, methodEndIndex - methodStartIndex + 1);
         lines.InsertRange(methodStartIndex, newMethodContent);
     }
+
 
     private static string GetIndentation(string line)
     {
