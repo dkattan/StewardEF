@@ -14,7 +14,7 @@ internal static class VersionChecker
             var result = new Version(installedVersion).CompareTo(new Version(latestReleaseVersion));
             if (result < 0)
             {
-                AnsiConsole.MarkupLine(@$"{Environment.NewLine}[bold seagreen2]This StewardEF version '{installedVersion}' is older than that of the runtime '{latestReleaseVersion}'. Update the tools for the latest features and bug fixes (`dotnet tool update -g craftsman`).[/]{Environment.NewLine}");
+                AnsiConsole.MarkupLine(@$"{Environment.NewLine}[bold seagreen2]This StewardEF version '{installedVersion}' is older than that of the runtime '{latestReleaseVersion}'. Update the tools for the latest features and bug fixes (`dotnet tool update -g stewardef`).[/]{Environment.NewLine}");
             }
         }
         catch (Exception)
