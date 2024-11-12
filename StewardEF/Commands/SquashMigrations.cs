@@ -226,14 +226,25 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             lines.RemoveAt(insertIndex);
         }
 
+        // Sort and prepare the usings
         var sortedUsings = usingStatements.OrderBy(u => u).ToList();
-
-        // Insert an empty line after the namespace for readability
-        sortedUsings.Insert(0, "");
-
-        // Insert the using statements into the lines at the insertIndex
-        lines.InsertRange(insertIndex, sortedUsings);
+        if (isScopedNamespace)
+        {
+            // Insert an empty line after the namespace for readability in scoped namespaces
+            sortedUsings.Insert(0, "");
+            sortedUsings.Add(Environment.NewLine); 
+            lines.InsertRange(insertIndex, sortedUsings);
+        }
+        else
+        {
+            // Indent using statements for unscoped namespaces
+            var indentation = GetIndentation(lines[namespaceIndex]) + "    ";
+            var indentedUsings = sortedUsings.Select(u => !string.IsNullOrEmpty(u) ? indentation + u : u).ToList();
+            indentedUsings.Add(Environment.NewLine); 
+            lines.InsertRange(insertIndex, indentedUsings);
+        }
     }
+
 
     private static void ReplaceMethodContent(List<string> lines, string methodName, string newContent)
     {
