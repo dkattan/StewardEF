@@ -51,6 +51,8 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             AnsiConsole.MarkupLine("[red]No migration files found to squash.[/]");
             return;
         }
+        
+        AnsiConsole.MarkupLine($"[yellow]Squashing {migrationFiles.Count} migration files...[/]");
 
         // Get the first migration file
         var firstMigrationFile = migrationFiles.First();
