@@ -41,7 +41,7 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             .OrderBy(f => f)
             .ToList();
 
-        // Filter out the snapshot files
+        // Filter out the snapshot file
         var migrationFiles = files
             .Where(f => !Path.GetFileName(f).EndsWith("ModelSnapshot.cs", StringComparison.OrdinalIgnoreCase))
             .OrderBy(f => f)
@@ -64,24 +64,20 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         // Insert the aggregated content into the first migration file
         var firstMigrationLines = File.ReadAllLines(firstMigrationFile).ToList();
 
-        // Replace the Up and Down methods in the first migration file
         ReplaceMethodContent(firstMigrationLines, "Up", upResult.AggregatedContent);
         ReplaceMethodContent(firstMigrationLines, "Down", downResult.AggregatedContent);
 
-        // Combine using statements from both results
         var allUsingStatements = new HashSet<string>(upResult.UsingStatements);
         foreach (var usingStmt in downResult.UsingStatements)
         {
             allUsingStatements.Add(usingStmt);
         }
-
-        // Update the using statements in the first migration file
         UpdateUsingStatements(firstMigrationLines, allUsingStatements);
 
         // Write the updated content back to the first migration file
         File.WriteAllLines(firstMigrationFile, firstMigrationLines);
 
-        // Delete subsequent migration files, except the first migration and it's designer file
+        // Delete subsequent migration files, except the first migration and its designer file
         var filesToDelete = migrationFiles.Skip(2).ToList();
 
         foreach (var file in filesToDelete)
@@ -114,7 +110,6 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
 
             if (collectUsings)
             {
-                // Extract the using statements
                 var usings = ExtractUsingStatements(migrationLines);
                 foreach (var u in usings)
                 {
@@ -122,7 +117,6 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
                 }
             }
 
-            // Extract the method content
             var methodContent = ExtractMethodContent(migrationLines, methodName);
             if (!string.IsNullOrEmpty(methodContent))
             {
@@ -212,7 +206,6 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
 
     private static void UpdateUsingStatements(List<string> lines, HashSet<string> usingStatements)
     {
-        // Find the index of the namespace declaration line
         var namespaceIndex = lines.FindIndex(line => line.TrimStart().StartsWith("namespace "));
         if (namespaceIndex == -1)
         {
@@ -303,20 +296,16 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         }
 
         if (methodEndIndex == -1) return;
-        
 
         // Replace the method content
         var newMethodContent = new List<string>();
 
-        // Add method signature and opening brace
         // Add method signature and opening brace with appropriate indentation
         newMethodContent.Add(lines[methodStartIndex]);
 
-        // Ensure opening brace is on its own line
         // Ensure opening brace is on its own line with correct indentation
         if (!lines[methodStartIndex].Trim().EndsWith("{"))
         {
-            newMethodContent.Add("{");
             newMethodContent.Add(indentation + "{");
         }
         
