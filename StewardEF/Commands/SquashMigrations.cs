@@ -77,6 +77,22 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         // Write the updated content back to the first migration file
         File.WriteAllLines(firstMigrationFile, firstMigrationLines);
 
+        // Identify the latest designer file
+        var latestDesignerFile = migrationFiles
+            .Where(f => Path.GetFileName(f).EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase))
+            .LastOrDefault();
+
+        // Rename the latest designer file to match the first migration file
+        if (latestDesignerFile != null)
+        {
+            var newDesignerFileName = Path.Combine(directory, Path.GetFileNameWithoutExtension(firstMigrationFile) + ".Designer.cs");
+            if (File.Exists(newDesignerFileName))
+            {
+                File.Delete(newDesignerFileName);
+            }
+            File.Move(latestDesignerFile, newDesignerFileName);
+        }
+
         // Delete subsequent migration files, except the first migration and its designer file
         var filesToDelete = migrationFiles.Skip(2).ToList();
 
