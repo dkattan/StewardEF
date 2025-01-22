@@ -1,9 +1,9 @@
 namespace StewardEF.Commands;
 
-using System.Text;
-using System.Text.RegularExpressions;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using System.Text;
+using System.Text.RegularExpressions;
 
 internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Settings>
 {
@@ -14,30 +14,33 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
 
         [CommandOption("-y|--year")]
         public int? Year { get; set; }
+
+        [CommandOption("-t|--target")]
+        public string? TargetMigration { get; set; } // Added target migration option
     }
 
     public override int Execute(CommandContext context, Settings settings)
     {
-        var directory = settings.MigrationsDirectory 
+        var directory = settings.MigrationsDirectory
                         ?? AnsiConsole.Ask<string>("[green]Enter the migrations directory path:[/]");
-        
+
         if (string.IsNullOrWhiteSpace(directory))
         {
             AnsiConsole.MarkupLine("[red]The specified directory is invalid.[/]");
             return 1;
         }
-        
+
         if (!Directory.Exists(directory))
         {
             AnsiConsole.MarkupLine("[red]The specified directory does not exist.[/]");
             return 1;
         }
 
-        SquashMigrations(directory, settings.Year);
+        SquashMigrations(directory, settings.Year, settings.TargetMigration);
         return 0;
     }
-    
-    static void SquashMigrations(string directory, int? year)
+
+    static void SquashMigrations(string directory, int? year, string? targetMigration)
     {
         // Get all .cs files including Designer.cs files
         var files = Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly)
@@ -53,7 +56,14 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         if (year.HasValue)
         {
             migrationFiles = migrationFiles
-                .Where(f => ParseYearFromFileName(f) <= year.Value)
+                .Where(f => ParseYearFromFileName(f) == year.Value)
+                .ToList();
+        }
+
+        if (targetMigration != null)
+        {
+            migrationFiles = migrationFiles
+                .TakeWhile(f => !Path.GetFileName(f).Contains(targetMigration, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 
@@ -62,7 +72,7 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             AnsiConsole.MarkupLine("[red]No migration files found to squash.[/]");
             return;
         }
-        
+
         AnsiConsole.MarkupLine($"[yellow]Squashing {migrationFiles.Count} migration files...[/]");
 
         // Get the first migration file
@@ -115,7 +125,7 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         AnsiConsole.MarkupLine($"[green]Migrations squashed successfully! {Emoji.Known.Sparkles}[/]");
     }
 
-    
+
     private class AggregatedMethodResult
     {
         public string AggregatedContent { get; set; }
@@ -225,7 +235,7 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
 
         return methodContent.ToString().Trim();
     }
-    
+
     private static IEnumerable<string> ExtractUsingStatements(string[] lines)
     {
         return lines.Where(line => line.TrimStart().StartsWith("using ")).Select(line => line.Trim());
@@ -256,14 +266,14 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         {
             // Insert an empty line after the namespace for readability in scoped namespaces
             sortedUsings.Insert(0, "");
-            sortedUsings.Add(Environment.NewLine); 
+            sortedUsings.Add(Environment.NewLine);
             lines.InsertRange(insertIndex, sortedUsings);
             return;
         }
 
         var indentation = GetIndentation(lines[namespaceIndex]) + "    ";
         var indentedUsings = sortedUsings.Select(u => !string.IsNullOrEmpty(u) ? indentation + u : u).ToList();
-        indentedUsings.Add(Environment.NewLine); 
+        indentedUsings.Add(Environment.NewLine);
         lines.InsertRange(insertIndex, indentedUsings);
     }
 
@@ -333,7 +343,7 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         {
             newMethodContent.Add(indentation + "{");
         }
-        
+
 
         // Add the new content with proper indentation
         var contentIndentation = GetIndentation(lines[methodStartIndex]);
