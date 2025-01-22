@@ -11,6 +11,9 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
     {
         [CommandArgument(0, "[MigrationsDirectory]")]
         public string? MigrationsDirectory { get; set; }
+
+        [CommandOption("-y|--year")]
+        public int? Year { get; set; }
     }
 
     public override int Execute(CommandContext context, Settings settings)
@@ -30,11 +33,11 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             return 1;
         }
 
-        SquashMigrations(directory);
+        SquashMigrations(directory, settings.Year);
         return 0;
     }
     
-    static void SquashMigrations(string directory)
+    static void SquashMigrations(string directory, int? year)
     {
         // Get all .cs files including Designer.cs files
         var files = Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly)
@@ -46,6 +49,14 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
             .Where(f => !Path.GetFileName(f).EndsWith("ModelSnapshot.cs", StringComparison.OrdinalIgnoreCase))
             .OrderBy(f => f)
             .ToList();
+
+        if (year.HasValue)
+        {
+            migrationFiles = migrationFiles
+                .Where(f => ParseYearFromFileName(f) <= year.Value)
+                .ToList();
+        }
+
         if (migrationFiles.Count == 0)
         {
             AnsiConsole.MarkupLine("[red]No migration files found to squash.[/]");
@@ -349,5 +360,11 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
         var lines = content.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
         var indentedLines = lines.Select(line => indentation + line).ToList();
         return indentedLines;
+    }
+
+    private static int ParseYearFromFileName(string fileName)
+    {
+        var match = Regex.Match(Path.GetFileName(fileName), @"^\d{4}");
+        return match.Success ? int.Parse(match.Value) : int.MaxValue;
     }
 }
