@@ -112,6 +112,10 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
                 File.Delete(newDesignerFileName);
             }
             File.Move(latestDesignerFile, newDesignerFileName);
+
+            // Update the class name and migration attribute in the designer file
+            UpdateDesignerFile(newDesignerFileName, firstMigrationFile);
+
         }
 
         // Delete subsequent migration files, except the first migration and its designer file
@@ -376,5 +380,20 @@ internal class SquashMigrationsCommand : Command<SquashMigrationsCommand.Setting
     {
         var match = Regex.Match(Path.GetFileName(fileName), @"^\d{4}");
         return match.Success ? int.Parse(match.Value) : int.MaxValue;
+    }
+    private static void UpdateDesignerFile(string designerFilePath, string firstMigrationFilePath)
+    {
+        var designerContent = File.ReadAllText(designerFilePath);
+        var firstMigrationFileName = Path.GetFileNameWithoutExtension(firstMigrationFilePath);
+        var className = firstMigrationFileName.Split('_').Last().Replace(" ", string.Empty); ;
+
+        // Replace the Migration attribute
+        designerContent = Regex.Replace(designerContent, @"\[Migration\(""[^""]*""\)\]", $"[Migration(\"{firstMigrationFileName}\")]");
+
+        // Replace the class name
+        designerContent = Regex.Replace(designerContent, @"partial class \w+", $"partial class {className}");
+
+
+        File.WriteAllText(designerFilePath, designerContent);
     }
 }
