@@ -1,9 +1,9 @@
-﻿using System.Runtime.InteropServices;
-using System.Text;
-using Spectre.Console;
+﻿using Spectre.Console;
 using Spectre.Console.Cli;
 using StewardEF;
 using StewardEF.Commands;
+using System.Runtime.InteropServices;
+using System.Text;
 
 var app = new CommandApp();
 
@@ -18,7 +18,9 @@ app.Configure(config =>
 
     config.AddCommand<SquashMigrationsCommand>("squash")
         .WithDescription("Squashes EF migrations into the first migration.")
-        .WithExample(["steward squash", "-d", "path/to/migrations"]);
+        .WithExample(new[] { "steward squash", "-d", "path/to/migrations" })
+        .WithExample(new[] { "steward squash", "-d", "path/to/migrations", "-y", "2023" })
+        .WithExample(new[] { "steward squash", "-d", "path/to/migrations", "-t", "Target migration" });
 });
 
 try
