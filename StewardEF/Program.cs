@@ -18,9 +18,9 @@ app.Configure(config =>
 
     config.AddCommand<SquashMigrationsCommand>("squash")
         .WithDescription("Squashes EF migrations into the first migration.")
-        .WithExample(new[] { "steward squash", "-d", "path/to/migrations" })
-        .WithExample(new[] { "steward squash", "-d", "path/to/migrations", "-y", "2023" })
-        .WithExample(new[] { "steward squash", "-d", "path/to/migrations", "-t", "Target migration" });
+        .WithExample(new[] { "steward squash", "path/to/migrations" })
+        .WithExample(new[] { "steward squash", "path/to/migrations", "-y", "2023" })
+        .WithExample(new[] { "steward squash", "path/to/migrations", "-t", "Target migration" });
 });
 
 try

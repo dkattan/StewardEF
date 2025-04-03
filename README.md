@@ -24,14 +24,14 @@ Squashes EF migrations into the first migration in the specified directory.
 #### **Usage:**
 
 ```bash
-steward squash -d path/to/migrations [-y year] [-t target]
+steward squash path/to/migrations [-y year] [-t target]
 ```
 
 ##### Options
 
-- `-d (or [MigrationsDirectory])`: Path to the directory containing your EF migrations. If omitted, you'll be prompted to enter it interactively.
-- `-y (or [Year])`: Optional. Specify the year up to which migrations should be squashed. If omitted, all migrations will be squashed.
-- `-t (or [TargetMigration])`: Optional. Specify the target migration up to which migrations should be squashed. If omitted, all migrations will be squashed.
+- `[MigrationsDirectory]`: Path to the directory containing your EF migrations. If omitted, you'll be prompted to enter it interactively.
+- `-y|--year`: Optional. Specify the year up to which migrations should be squashed. If omitted, all migrations will be squashed.
+- `-t|--target`: Optional. Specify the target migration up to which migrations should be squashed. If omitted, all migrations will be squashed.
 
 #### **How It Works**
 
